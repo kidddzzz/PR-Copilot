@@ -1,0 +1,21 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment variables / secrets
+.env
+
+# OS/editor junk
+.DS_Store
+.vscode/
+.idea/
+
+# Test/coverage artifacts
+.pytest_cache/
+.coverage
