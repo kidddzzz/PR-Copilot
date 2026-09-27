@@ -16,20 +16,48 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from schema import SEVERITY_ORDER, validate_agent_output, SchemaError
 from mock_agents import ALL_AGENTS
 
+import os
+import requests
+
+GITHUB_API_BASE = "https://api.github.com"
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+REPO_OWNER = "kidddzzz"      # change if your GitHub username differs
+REPO_NAME = "PR-Copilot"     # change if you renamed the repo
 
 # ---------------------------------------------------------------------------
 # Step 1: Trigger
 # ---------------------------------------------------------------------------
-def get_pr_diff() -> str:
-    """Stand-in for pulling a real PR diff via GitHub API.
-
-    Replace with an actual GitHub API call (or webhook payload parsing)
-    once the Docs/Integration Dev's GitHub piece is ready. For now this
-    just returns a placeholder string -- the mock agents ignore its
-    content and return pre-seeded findings matching demo-repo/.
+def get_pr_diff(pr_number: int) -> str:
+    """Pull the real diff (changed files + patches) for a PR via GitHub API.
+ 
+    Note: this now takes a pr_number argument, since it's a real PR instead
+    of a mock placeholder. Update the call in run_pipeline() accordingly.
     """
-    return "<mock PR diff — replace with real GitHub PR diff>"
-
+    if not GITHUB_TOKEN:
+        raise RuntimeError(
+            "GITHUB_TOKEN environment variable is not set. "
+            "See setup steps before running this."
+        )
+ 
+    url = f"{GITHUB_API_BASE}/repos/{REPO_OWNER}/{REPO_NAME}/pulls/{pr_number}/files"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()  # raises a clear error on 401/404/etc.
+    files = response.json()
+ 
+    if not files:
+        return "(no changed files found in this PR)"
+ 
+    diff_parts = []
+    for f in files:
+        filename = f["filename"]
+        patch = f.get("patch", "(no text patch available for this file)")
+        diff_parts.append(f"--- {filename} ---\n{patch}")
+ 
+    return "\n\n".join(diff_parts)
 
 # ---------------------------------------------------------------------------
 # Step 2: Dispatch (parallel)
@@ -122,25 +150,42 @@ def format_report_as_markdown(report: dict) -> str:
     return "\n".join(lines)
 
 
-def post_report(report_markdown: str) -> None:
-    """Stand-in for posting the report as a PR comment via GitHub API.
-
-    Replace with an actual `requests.post(...)` call to the GitHub Issues/
-    PR comments API once the Docs/Integration Dev's GitHub piece is ready.
+def post_report(pr_number: int, report_markdown: str) -> None:
+    """Post the merged review report as a real comment on the PR.
+ 
+    Note: this now takes a pr_number argument too. GitHub treats PR
+    comments as "issue comments" under the hood, so this uses the
+    issues/comments endpoint even though it's a pull request.
     """
-    print(report_markdown)
+    if not GITHUB_TOKEN:
+        raise RuntimeError(
+            "GITHUB_TOKEN environment variable is not set. "
+            "See setup steps before running this."
+        )
+ 
+    url = f"{GITHUB_API_BASE}/repos/{REPO_OWNER}/{REPO_NAME}/issues/{pr_number}/comments"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+    }
+    response = requests.post(url, headers=headers, json={"body": report_markdown})
+    response.raise_for_status()
+ 
+    comment_url = response.json().get("html_url", "")
+    print(f"Posted report to PR #{pr_number}: {comment_url}")
 
 
 # ---------------------------------------------------------------------------
 # Full pipeline
 # ---------------------------------------------------------------------------
-def run_pipeline() -> None:
-    pr_diff = get_pr_diff()
+def run_pipeline(pr_number: int) -> None:
+    pr_diff = get_pr_diff(pr_number)
     agent_outputs = dispatch_to_agents(pr_diff)
     report = merge_reports(agent_outputs)
     report_markdown = format_report_as_markdown(report)
-    post_report(report_markdown)
-
-
+    post_report(pr_number, report_markdown)
+ 
+ 
 if __name__ == "__main__":
-    run_pipeline()
+    TEST_PR_NUMBER = 1  # <-- change this to your real test PR's number
+    run_pipeline(TEST_PR_NUMBER)
