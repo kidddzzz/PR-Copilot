@@ -22,3 +22,4 @@ def login(username: str, stored_hash: str, provided_hash: str) -> str:
     if is_valid_login(stored_hash, provided_hash):
         return f"Welcome back, {username}!"
     return "Invalid credentials."
+
