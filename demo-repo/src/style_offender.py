@@ -16,3 +16,5 @@ def CalculateTotal(itemList):  # <-- seeded issue: function name should be snake
 
 def get_greeting(Name):  # <-- seeded issue: parameter should be lowercase
     return 'Hello, ' + Name + "!"  # <-- seeded issue: mixed quote styles
+
+
