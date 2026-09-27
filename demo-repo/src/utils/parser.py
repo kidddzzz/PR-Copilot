@@ -21,3 +21,4 @@ def parse_date(raw: str):
 def normalize_whitespace(text: str) -> str:
     """Collapse repeated whitespace into single spaces. (Has a test.)"""
     return " ".join(text.split())
+
