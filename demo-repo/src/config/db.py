@@ -23,3 +23,4 @@ def get_connection():
         password=DB_PASSWORD,
         dbname=DB_NAME,
     )
+
